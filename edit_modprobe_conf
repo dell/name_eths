@@ -1,0 +1,11 @@
+#!/bin/sh
+# This must be sourced from mactab_to_*_configfiles
+
+# edit /etc/modprobe.conf
+egrep -v "$alias eth.*" /etc/modprobe.conf > ${tmp_file}
+let i=0;
+while [ ${i} -lt ${#ETH_NAME[@]} ]; do
+    echo "alias ${ETH_NAME[${i}]} ${ETH_DRIVER[${i}]}" >> ${tmp_file}
+    i=$((i+1))
+done
+mv -f ${tmp_file} /etc/modprobe.conf

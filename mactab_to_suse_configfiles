@@ -1,0 +1,44 @@
+#!/bin/bash
+#
+# mactab_to_configfiles
+# Copyright (c) 2006 Dell, Inc.
+#  by Matt Domsch <Matt_Domsch@dell.com>
+#  Dual-licensed under the GNU GPL v2 or later
+#  or the Mozilla Public License v1.1 or later
+#
+# This program takes a list of ethernet device names,
+# MAC addresses, and driver names, and sets the
+# /etc/udev/rules.d/30-net_persistent_names.rules to match
+# It also changes the order of the drivers listed in /etc/modprobe.conf
+# to match.
+
+RULE_FILE=/etc/udev/rules.d/30-net_persistent_names.rules
+
+let i=0
+while read eth mac comment driver; do
+      ETH_NAME[${i}]=${eth}
+      ETH_MAC[${i}]=`echo ${mac} | awk '{print toupper($1)}'`
+      ETH_DRIVER[${i}]=${driver}
+      i=$((i+1))
+done
+
+
+
+
+tmp_file=`mktemp /tmp/mactab_to_configfiles.XXXXXX`
+trap "rm -f $tmp_file" QUIT TERM INT HUP EXIT
+
+[ -r $RULE_FILE ] && sed -e '/^SUBSYSTEM==\"net\"/d' $RULE_FILE >> $tmp_file
+
+let i=0
+while [ ${i} -lt ${#ETH_NAME[@]} ]; do
+	echo "SUBSYSTEM==\"net\", ACTION==\"add\"," \
+	    "SYSFS{address}==\"${ETH_MAC[${i}]}\"," \
+	    "IMPORT=\"/lib/udev/rename_netiface %k ${ETH_NAME[${i}]}\"" \
+	    >> $tmp_file
+	i=$((i+1))
+done
+mv ${tmp_file} $RULE_FILE
+
+. ./edit_modprobe_conf
+rm -f ${tmp_file}

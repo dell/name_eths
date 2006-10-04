@@ -1,0 +1,6 @@
+Run the 'name_eths' program, and it renames your ethernet devices such
+that the embedded (LAN-on-Motherboard, or LOM) devices, are
+enumerated first, then the add-in NICs are enumerated in slot, bus,
+and MAC address order.
+
+See the COPYING and LICENSE files for license information.

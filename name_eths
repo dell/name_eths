@@ -1,0 +1,3 @@
+#!/bin/bash
+
+./eths_to_mactab.pl | ./mactab_to_configfiles

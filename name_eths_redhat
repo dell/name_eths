@@ -1,0 +1,3 @@
+#!/bin/bash
+
+./hw_eth_order.pl | ./mactab_to_redhat_configfiles

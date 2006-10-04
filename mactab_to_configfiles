@@ -1,0 +1,42 @@
+#!/bin/bash
+
+let i=0
+while read eth mac comment driver; do
+      ETH_NAME[${i}]=${eth}
+      ETH_MAC[${i}]=`echo ${mac} | awk '{print toupper($1)}'`
+      ETH_DRIVER[${i}]=${driver}
+      i=$((i+1))
+done
+
+let i=0
+tmp_file=`mktemp /tmp/mactab_to_configfiles.XXXXXX`
+while [ ${i} -lt ${#ETH_NAME[@]} ]; do
+    CFG=/etc/sysconfig/network-scripts/ifcfg-${ETH_NAME[${i}]}
+    if [ -f ${CFG} ]; then
+	EXISTING_MAC=`grep ^HWADDR ${CFG} | awk -F= '{print toupper($2)}'`
+	if [ -n "${EXISTING_MAC}" ]; then
+	    if [ "${EXISTING_MAC}" != "${ETH_MAC[${i}]}" ]; then
+		echo "Changing $CFG HWADDR from ${EXISTING_MAC} to ${ETH_MAC[${i}]}"
+		sed -e "s/HWADDR=.*/HWADDR=${ETH_MAC[${i}]}/" ${CFG} > ${tmp_file}
+		mv -f ${tmp_file} ${CFG}
+	    fi
+	else
+	    echo "Adding $CFG HWADDR ${ETH_MAC[${i}]}"
+	    echo "HWADDR=${ETH_MAC[${i}]}" >> ${CFG}
+	fi
+    fi
+    i=$((i+1))
+done
+
+
+# edit /etc/modprobe.conf
+egrep -v "$alias eth.*" /etc/modprobe.conf > ${tmp_file}
+let i=0;
+while [ ${i} -lt ${#ETH_NAME[@]} ]; do
+    echo "alias ${ETH_NAME[${i}]} ${ETH_DRIVER[${i}]}" >> ${tmp_file}
+    i=$((i+1))
+done
+mv -f ${tmp_file} /etc/modprobe.conf
+
+
+rm -f ${tmp_file}

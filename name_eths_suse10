@@ -1,0 +1,3 @@
+#!/bin/sh
+
+./hw_eth_order.pl | ./mactab_to_suse_configfiles
