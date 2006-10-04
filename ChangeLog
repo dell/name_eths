@@ -2,3 +2,6 @@
 - match both Ethernet and Network devices from lspci
   (thanks to Bill Nottingham for catching)
 - created name_eths_sles9
+
+* 2006 October 04 - Matt Domsch <Matt_Domsch@dell.com>
+- made SLES9 functional
