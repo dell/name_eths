@@ -1,0 +1,36 @@
+#!/bin/bash
+#
+# mactab_to_sles9_configfiles
+# Copyright (c) 2006 Dell, Inc.
+#  by Matt Domsch <Matt_Domsch@dell.com>
+#  Dual-licensed under the GNU GPL v2 or later
+#  or the Mozilla Public License v1.1 or later
+#
+# This program takes a list of ethernet device names,
+# MAC addresses, and driver names, and sets the
+# /etc/sysconfig/network/ifcfg-eth-id-$mac PERMANENT_NAME fields to match.
+
+let i=0
+while read eth mac comment driver; do
+      ETH_NAME[${i}]=${eth}
+      ETH_MAC[${i}]=`echo ${mac} | awk '{print toupper($1)}'`
+      ETH_MAC_LC[${i}]=`echo ${mac} | awk '{print tolower($1)}'`
+      ETH_DRIVER[${i}]=${driver}
+      i=$((i+1))
+done
+
+tmpdir=`mktemp -d /tmp/mactab_to_configfiles.XXXXXX`
+trap "rm -rf $tmpdir" QUIT TERM INT HUP EXIT
+
+let i=0
+while [ ${i} -lt ${#ETH_NAME[@]} ]; do
+    CFG=/etc/sysconfig/network/ifcfg-eth-id-${ETH_MAC_LC[${i}]}
+    if [ -f ${CFG} ]; then
+	sed -e "s/PERMANENT_NAME=.*/PERMANENT_NAME=\'${ETH_NAME[${i}]}\'" $CFG > $tmpdir/`basename $CFG`
+	mv $tmpdir/`basename $CFG` /etc/sysconfig/network
+    fi
+    i=$((i+1))
+done
+
+# Use our versions of ifup and friends
+cp -r sles9/* /

@@ -1,0 +1,199 @@
+#! /bin/bash
+#
+PATH="/sbin:/bin"
+
+declare -i MAXLOOPS=40          #
+declare -i LOOPDELAY=500000     # useconds
+declare -i MAXIFNUM=1024        #
+USED_IFACE_FILE_STUB=/tmp/used_interface_names
+USED_IFACE_FILE="`mktemp $USED_IFACE_FILE_STUB.XXXXXXXX`"
+
+STAMPFILE=/tmp/dummy_stamp
+trap 'rm -f $USED_IFACE_FILE
+      echo renamed > $STAMPFILE' EXIT
+
+. /etc/sysconfig/network/config
+. /etc/sysconfig/network/scripts/functions
+
+if [ -r /sys/class/net/$1/ifindex ] ; then
+	STAMPFILE=$STAMPFILE_STUB`cat /sys/class/net/$1/ifindex`
+else
+	STAMPFILE=${STAMPFILE_STUB}no_iface
+fi
+echo virgin > $STAMPFILE
+
+#exec 2>>/tmp/rename_netiface.$1-$2.$SEQNUM.log
+#set -x
+
+error_exit() {
+	local RET
+	declare -i RET=$1
+	if [ $RET -ne "$1" ] ; then
+		RET=255
+	else
+		shift
+	fi
+	err_mesg "$@"
+	exit $RET
+}
+
+usage() {
+	mesg "usage: $0 <oldname> [<newname>]" >&2
+	error_exit $*
+}
+
+check_if_name_is_free() {
+	cat $USED_IFACE_FILE_STUB* \
+	    | grep -vs "$DEV_ID" \
+	    | grep -q "^$NEWNAME" && return 1
+	echo $NEWNAME $DEV_ID >> $USED_IFACE_FILE
+	usleep $((RANDOM%600+700))000
+	cat $USED_IFACE_FILE_STUB* \
+	    | grep -vs "$DEV_ID" \
+	    | grep -q "^$NEWNAME" && return 1
+	return 0
+}
+
+
+test $# -gt 2 && usage 1 "too many arguments: $*"
+OLDNAME=$1
+NEWNAME=$2
+test -z "$OLDNAME" && usage 2 "too little arguments"
+ls /sys/class/net/$OLDNAME 2>/dev/null 1>&2 \
+    || error_exit 3 "oldname $OLDNAME does not exist"
+NAMEBASE=${OLDNAME%%[0-9]*}
+case "$NAMEBASE" in
+	eth|ath|wlan|ra|hsi|ctc|tr)
+		: go on
+		;;
+	*)
+		exit 0
+		;;
+esac
+# Also check if interface is not an vlan interface
+test -f "/proc/net/vlan/$OLDNAME" && exit 0
+declare -i IFNUM=${OLDNAME##$NAMEBASE}
+
+if [ "$PHYSDEVBUS" == ccwgroup ] ; then
+	get_device_id() {
+		if [ -z "$PHYSDEVPATH" -a -L /sys/class/net/$1/device ] ; then
+			PHYSDEVPATH=`cd -P /sys/class/net/$1/device; pwd`
+			PHYSDEVPATH=${PHYSDEVPATH#/sys}
+		fi
+		if [ -n "$PHYSDEVPATH" -a -d /sys/$PHYSDEVPATH ] ; then
+			DEV_ID=${PHYSDEVPATH##*/}
+		else
+			DEV_ID=$2
+		fi
+	}
+else
+	get_device_id() {
+		if ls /sys/class/net/$1 2>/dev/null 1>&2; then
+			DEV_ID=`cat /sys/class/net/$1/address`
+		else
+			DEV_ID=$2
+		fi
+	}
+fi
+
+if [ -z "$NEWNAME" ] ; then
+	# This routine looks for a network interface name that is still not
+	# used as persistent name. At first it tries the name the interface
+	# currently has. If this name is already occupied, then increase the
+	# number and try again.
+	# To check if a name is occupied we have to look in
+	# /etc/udev/rules.d/60-net_*.rules and in /tmp/used_interface_names*.
+	# The latter serves as temporary registration file to avoid race
+	# conditions. It will be removed when the script exits.
+
+        # Try using the BIOS name
+        if [ -x /sbin/bios_dev_name ] ; then
+	        unset POLICY
+                [ -n "$BIOS_DEV_NAME_POLICY" ] &&
+		POLICY="--policy=$BIOS_DEV_NAME_POLICY"
+                NEWNAME="$(/sbin/bios_dev_name $POLICY -i $OLDNAME)"
+        fi    
+
+        [ -z "$NEWNAME" ] && NEWNAME=$OLDNAME
+	get_device_id "$OLDNAME" "$2"
+	if [ -z "$DEV_ID" ] ; then
+		error_exit 4 "no device id for $OLDNAME"
+	fi
+	if [ "${DEV_ID//0/}" == ":::::" ] ; then
+		# Workaround for some drivers which don't request their
+		# firmware before beeing set up and don't have a mac address
+		# before firmware was loaded.
+		ip link set up dev $OLDNAME
+		ip link set down dev $OLDNAME
+		# Do we have to wait some time?
+		for i in 0 1 2 3 4 5 6 7 8 9; do
+			get_device_id "$OLDNAME"
+			info_mesg "waiting for a usefull mac address: $DEV_ID"
+			test "${DEV_ID//0/}" != ":::::" && break
+			sleep 1
+		done
+	fi
+	if [ "${DEV_ID//0/}" == ":::::" ] ; then
+		error_exit 5 "all zero mac address for $OLDNAME"
+	fi
+	
+	while ! check_if_name_is_free; do
+		while [ $IFNUM -lt $MAXIFNUM ] ; do
+			: $((IFNUM++))
+			NEWNAME=$NAMEBASE$IFNUM
+			ls /sys/class/net/$NEWNAME 2>/dev/null 1>&2 && continue
+			continue 2
+		done
+		error_exit 6 "could not get a free persistent interfacename" \
+		         "for $OLDNAME ($DEV_ID)"
+	done
+	info_mesg "$OLDNAME: new persistent name for $DEV_ID is $NEWNAME"
+fi
+if [ -z "$NEWNAME" ] ; then
+	error_exit 7 "cannot get a valid new interface name"
+fi
+
+# Simply try to rename directly, because it will work in most cases
+if nameif -r "$NEWNAME" "$OLDNAME" 2>/dev/null 1>&2; then
+        info_mesg "$OLDNAME -> $NEWNAME: immediate success"
+	INTERFACE=$NEWNAME
+	exit 0
+fi
+
+# Generate a temporary interface name
+TMPNAME="${NAMEBASE}xx${IFNUM}"
+ls /sys/class/net/$TMPNAME 2>/dev/null 1>&2 \
+    && error_exit 10 "temporary interface name $TMPNAME does exist"
+
+# Rename it to the temporary name.
+# Then try several times to rename it to new name
+nameif -r "$TMPNAME" "$OLDNAME" 2>/dev/null 1>&2 \
+    || error_exit 11 "cannot rename interface to temporary name $TMPNAME"
+echo looping > $STAMPFILE
+declare -i LOOPS=0
+while [ $MAXLOOPS -gt $LOOPS ] ; do
+	: $((LOOPS++))
+	if nameif -r "$NEWNAME" "$TMPNAME" 2>/dev/null 1>&2; then
+		info_mesg "$OLDNAME -> $NEWNAME: success after $LOOPS loops"
+		INTERFACE=$NEWNAME
+		exit 0
+	fi
+	usleep $LOOPDELAY
+done
+
+if nameif -r "$OLDNAME" "$TMPNAME" 2>/dev/null 1>&2; then
+	info_mesg "$OLDNAME -> $NEWNAME: NO success after $LOOPS loops." \
+	          "Interface again named $OLDNAME"
+else
+	info_mesg "$OLDNAME -> $NEWNAME: NO success after $LOOPS loops." \
+	          "Interface now named $TMPNAME, because $OLDNAME was no" \
+	          "longer available"
+	INTERFACE=$TMPNAME
+fi
+exit 0
+
+
+
+
+
+
