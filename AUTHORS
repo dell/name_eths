@@ -1,8 +1,17 @@
-# dump_pirq 1.21 2001/09/05 02:59:31
-# A utility to parse the BIOS PCI IRQ Routing Table
-# Copyright (C) 2000 David A. Hinds -- dahinds@users.sourceforge.net
-# copy taken from the project posted at http://pcmcia-cs.sourceforge.net/
+* dump_pirq 1.21 2001/09/05 02:59:31
+ A utility to parse the BIOS PCI IRQ Routing Table
+ Copyright (C) 2000 David A. Hinds -- dahinds@users.sourceforge.net
+ copy taken from the project posted at http://pcmcia-cs.sourceforge.net/
 
-# name_eths, eths_to_mactab.pl, and mactab_to_configfiles
-# Copyright (C) 2006 Dell, Inc -- Matt_Domsch@dell.com
+* sles9/sbin/rename_netiface
+* sles9/etc/sysconfig/network/scripts/functions.common
+ copied from Novell/SuSE Linux Enterprise Server 10 sysconfig
+ package (GPLv2)
 
+* sles9/sbin/ifup
+ modified slightly from Novell/SuSE Linux Enterprise Server 9
+ sysconfig package (GPLv2)
+
+
+* all other files
+ Copyright (C) 2006 Dell, Inc -- Matt_Domsch@dell.com
