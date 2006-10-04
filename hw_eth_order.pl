@@ -30,7 +30,7 @@ sub get_pirq
     my %pirq = ();
     open(DUMP_PIRQ, "./dump_pirq |") or die "can't open ./dump_pirq: $!";
     while (<DUMP_PIRQ>) {
-	next unless $_ =~ /\(slot \w\): Ethernet/;
+	next unless $_ =~ /\(slot \w\): (Ethernet|Network)/;
 	if (/^Device (\S+:[^\. ]+?)\.0 \(slot (\w)\)/) {
 	    # add domain 0000: to the name, delete .0 function part
 	    $pirq{"0000:$1"} = $2;
@@ -71,21 +71,6 @@ sub get_ethtool_info
     close(ETHTOOL);
     return ($driver, $bus);
 }    
-
-sub print_hoh
-{
-    my $href = shift(@_);
-    while ( my ($key, $value) = each(%$href) ) {
-	print "$key => ";
-	while ( my ($key2, $value2) = each(%$value)) {
-	    if (defined($key2) and defined($value2)) {
-		print "[ $key2 => $value2 ]";
-	    }
-	}
-	print "\n";
-    }
-}
-
 
 my %map;
 my @eths = get_eths;

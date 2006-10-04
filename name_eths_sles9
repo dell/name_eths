@@ -1,0 +1,21 @@
+#!/bin/sh
+
+FILES_TO_DELETE=""
+DRIVERSEXP=`mktemp /tmp/name_eths_sles9.XXXXXX`
+FILES_TO_DELETE="$FILES_TO_DELETE $DRIVERSEXP"
+trap "rm -f $FILES_TO_DELETE" QUIT TERM INT HUP EXIT
+
+./hw_eth_order.pl > /etc/mactab
+DRIVERS=$(awk '{print $4}' /etc/mactab | sort | uniq)
+awk '{print "^install $4"}' /etc/mactab > ${DRIVERSEXP}
+
+MODPROBECONF=`mktemp /tmp/name_eths_sles9.XXXXXX`
+FILES_TO_DELETE="$FILES_TO_DELETE $MODPROBECONF"
+egrep -v -f ${DRIVERSEXP} /etc/modprobe.conf > ${MODPROBECONF}
+for d in ${DRIVERS}; do
+    echo "install $d /sbin/modprobe --ignore-install $d; /sbin/nameif" >> ${MODPROBECONF}
+done
+mv $MODPROBECONF /etc/modprobe.conf
+rm -f ${FILES_TO_DELETE}
+echo "You should now reboot your system so the changes made"
+echo "to the ethernet device names may take effect."

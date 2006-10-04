@@ -1,0 +1,4 @@
+* 2006 August 30 - Matt Domsch <Matt_Domsch@dell.com>
+- match both Ethernet and Network devices from lspci
+  (thanks to Bill Nottingham for catching)
+- created name_eths_sles9
