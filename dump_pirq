@@ -40,7 +40,7 @@ sub class_of
     open(IN, "/sbin/lspci -s $slot |");
     $_ = <IN>;
     close(IN);
-    return (/^....... ([^:]+):/) ? $1 : "";
+    return (/^([[:xdigit:]]{4}:)*....... ([^:]+):/) ? $2 : "";
 }
 
 sub parse_pirq
