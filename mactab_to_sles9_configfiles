@@ -25,9 +25,19 @@ trap "rm -rf $tmpdir" QUIT TERM INT HUP EXIT
 let i=0
 while [ ${i} -lt ${#ETH_NAME[@]} ]; do
     CFG=/etc/sysconfig/network/ifcfg-eth-id-${ETH_MAC_LC[${i}]}
-    if [ -f ${CFG} ]; then
-	sed -e "s/PERMANENT_NAME=.*/PERMANENT_NAME=\'${ETH_NAME[${i}]}\'" $CFG > $tmpdir/`basename $CFG`
-	mv $tmpdir/`basename $CFG` /etc/sysconfig/network
+    if [ -e $CFG ]; then
+	unset PERMANENT_NAME
+	. $CFG
+	if [ -n "${PERMANENT_NAME}" ]; then
+	    if [ "${PERMANENT_NAME}" != "${ETH_NAME[${i}]}" ]; then
+		echo "Changing $CFG PERMANENT_NAME from ${PERMANENT_NAME} to ${ETH_NAME[${i}]}"
+		sed -e "s:PERMANENT_NAME=.*:PERMANENT_NAME=\'${ETH_NAME[${i}]}\':" $CFG > $tmpdir/`basename $CFG`
+		mv $tmpdir/`basename $CFG` /etc/sysconfig/network
+	    fi
+	else
+	    echo "Adding $CFG PERMANENT_NAME ${ETH_NAME[${i}]}"
+	    echo "PERMANENT_NAME='${ETH_NAME[${i}]}'" >> ${CFG}
+	fi
     fi
     i=$((i+1))
 done
