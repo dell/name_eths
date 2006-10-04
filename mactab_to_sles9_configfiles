@@ -8,7 +8,7 @@
 #
 # This program takes a list of ethernet device names,
 # MAC addresses, and driver names, and sets the
-# /etc/sysconfig/network/ifcfg-eth-id-$mac PERMANENT_NAME fields to match.
+# /etc/sysconfig/network/ifcfg-eth-id-$mac PERSISTENT_NAME fields to match.
 
 let i=0
 while read eth mac comment driver; do
@@ -26,21 +26,43 @@ let i=0
 while [ ${i} -lt ${#ETH_NAME[@]} ]; do
     CFG=/etc/sysconfig/network/ifcfg-eth-id-${ETH_MAC_LC[${i}]}
     if [ -e $CFG ]; then
-	unset PERMANENT_NAME
+	unset PERSISTENT_NAME
 	. $CFG
-	if [ -n "${PERMANENT_NAME}" ]; then
-	    if [ "${PERMANENT_NAME}" != "${ETH_NAME[${i}]}" ]; then
-		echo "Changing $CFG PERMANENT_NAME from ${PERMANENT_NAME} to ${ETH_NAME[${i}]}"
-		sed -e "s:PERMANENT_NAME=.*:PERMANENT_NAME=\'${ETH_NAME[${i}]}\':" $CFG > $tmpdir/`basename $CFG`
+	if [ -n "${PERSISTENT_NAME}" ]; then
+	    if [ "${PERSISTENT_NAME}" != "${ETH_NAME[${i}]}" ]; then
+		echo "Changing $CFG PERSISTENT_NAME from ${PERSISTENT_NAME} to ${ETH_NAME[${i}]}"
+		sed -e "s:PERSISTENT_NAME=.*:PERSISTENT_NAME=\'${ETH_NAME[${i}]}\':" $CFG > $tmpdir/`basename $CFG`
 		mv $tmpdir/`basename $CFG` /etc/sysconfig/network
 	    fi
 	else
-	    echo "Adding $CFG PERMANENT_NAME ${ETH_NAME[${i}]}"
-	    echo "PERMANENT_NAME='${ETH_NAME[${i}]}'" >> ${CFG}
+	    echo "Adding $CFG PERSISTENT_NAME ${ETH_NAME[${i}]}"
+	    echo "PERSISTENT_NAME='${ETH_NAME[${i}]}'" >> ${CFG}
 	fi
     fi
     i=$((i+1))
 done
 
 # Use our versions of ifup and friends
-cp -r sles9/* /
+cd sles9
+unset DIFF
+DIFF=$(which diff)
+for f in etc/sysconfig/network/scripts/functions.common \
+    sbin/ifup sbin/rename_netiface ; do
+  if [ -n "$DIFF" ] ; then
+      $DIFF /$f $f > /dev/null 2>&1
+      RC=$?
+      if [ $RC -eq 1 ] ; then
+	  echo "Replacing /$f with our copy."
+	  cp $f /$f
+	  chmod 755 /$f
+      elif [ $RC -gt 1 ] ; then
+	  echo "Installing /$f with our copy."
+	  cp $f /$f
+	  chmod 755 /$f
+      fi
+  else
+      echo "Replacing /$f with our copy."
+      cp $f /$f
+      chmod 755 /$f
+  fi
+done
