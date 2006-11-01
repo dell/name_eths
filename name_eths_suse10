@@ -1,3 +1,5 @@
 #!/bin/sh
 
+export LANG=C
+
 ./hw_eth_order.pl | ./mactab_to_suse_configfiles
