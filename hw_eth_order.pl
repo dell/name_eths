@@ -11,6 +11,9 @@
 # (ascending MAC address order if multiple LOMs exist)
 # then listing the NICs on the add-in cards
 # (ascending by PCI slot number, then PCI bus number, then MAC address)
+#
+#  adding exceptions to ignore Xen FF... and 00... devices
+#  Luke Crawford <lsc@prgmr.com>   <lcrawford@ea.com>
 
 
 use strict;
@@ -47,6 +50,10 @@ sub get_eths
     open (IFCONFIG, "/sbin/ifconfig -a |") or die "can't open /sbin/ifconfig: $!";
     while (<IFCONFIG>) {
 	next unless $_ =~ /Ethernet/;
+	# ignore devices with incredibly wrong MACs
+        next if $_ =~ m/00:00:00:00:00:00/;
+        next if $_ =~ m/FF:FF:FF:FF:FF:FF/;
+        next if $_ =~ m/FE:FF:FF:FF:FF:FF/;
 	($e) = split(' ', $_);
 	push @eths, $e;
     }
