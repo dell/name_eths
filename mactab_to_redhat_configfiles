@@ -26,6 +26,10 @@ trap "rm -f $tmp_file" QUIT TERM INT HUP EXIT
 let i=0
 while [ ${i} -lt ${#ETH_NAME[@]} ]; do
     CFG=/etc/sysconfig/network-scripts/ifcfg-${ETH_NAME[${i}]}
+    if [ ! -f ${CFG} ]; then
+        echo "DEVICE=${ETH_NAME[${i}]}" >> ${CFG}
+        echo "ONBOOT=yes" >> ${CFG}
+    fi
     if [ -f ${CFG} ]; then
 	EXISTING_MAC=`grep ^HWADDR ${CFG} | awk -F= '{print toupper($2)}'`
 	if [ -n "${EXISTING_MAC}" ]; then
